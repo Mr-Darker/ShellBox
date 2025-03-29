@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# 添加临时代理
+# export https_proxy=http://127.0.0.1:7890
+# export http_proxy=http://127.0.0.1:7890
+
 # 配置路径
 VENV_DIR="$HOME/venvs/jupyter_env"
 PROJECT_DIR="$HOME/workstation/notebooks"
