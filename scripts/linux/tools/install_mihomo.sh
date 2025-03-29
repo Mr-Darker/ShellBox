@@ -26,41 +26,44 @@ detect_arch() {
 
 # ========== 📦 下载并安装 Mihomo ==========
 download_and_install_mihomo() {
-    if command -v mihomo >/dev/null 2>&1; then
-        echo -e "${GREEN}✅ mihomo 已安装，跳过下载和安装。${NC}"
-        return
+    # if command -v mihomo >/dev/null 2>&1; then
+    #     echo -e "${GREEN}✅ mihomo 已安装，跳过下载和安装。${NC}"
+    #     return
+    # fi
+
+    # 检测是否存在本地已下载文件
+    LOCAL_FILE=$(ls ./mihomo-*${TARGET}*.gz 2>/dev/null | head -n 1)
+    if [[ -n "$LOCAL_FILE" ]]; then
+        echo -e "${YELLOW}📦 检测到本地文件：$LOCAL_FILE，跳过下载${NC}"
+        FILENAME_BASE="$LOCAL_FILE"
+    else
+        echo -e "${GREEN}📱 正在获取最新版本下载链接...${NC}"
+        ALL_URLS=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/latest \
+            | grep "browser_download_url" \
+            | grep "${TARGET}" \
+            | grep ".gz" \
+            | cut -d '"' -f 4)
+
+        echo -e "${YELLOW}🔍 匹配到的下载链接如下：${NC}"
+        echo "$ALL_URLS"
+
+        BEST_MATCH=$(echo "$ALL_URLS" | grep -vE 'compatible|go[0-9]+' | grep "${TARGET}" | head -n 1)
+        FALLBACK_GO=$(echo "$ALL_URLS" | grep -v "compatible" | grep "go" | grep "${TARGET}" | head -n 1)
+        FALLBACK_COMPATIBLE=$(echo "$ALL_URLS" | grep "compatible" | grep "${TARGET}" | head -n 1)
+
+        FILENAME=${BEST_MATCH:-${FALLBACK_GO:-$FALLBACK_COMPATIBLE}}
+
+        if [[ -z "$FILENAME" ]]; then
+            echo -e "${RED}❌ 无法获取有效下载链接，请检查网络或架构配置。${NC}"
+            exit 1
+        fi
+
+        FILENAME_BASE=$(basename "$FILENAME")
+        echo -e "${GREEN}⬇️ 开始下载 Mihomo: $FILENAME_BASE${NC}"
+        wget -O "$FILENAME_BASE" "$FILENAME"
     fi
 
-    echo -e "${GREEN}📡 正在获取最新版本下载链接...${NC}"
-
-    # 获取所有 .gz 下载链接
-    ALL_URLS=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/latest \
-        | grep "browser_download_url" \
-        | grep "${TARGET}" \
-        | grep ".gz" \
-        | cut -d '"' -f 4)
-
-    echo -e "${YELLOW}🔍 匹配到的下载链接如下：${NC}"
-    echo "$ALL_URLS"
-
-    # 优先匹配策略
-    BEST_MATCH=$(echo "$ALL_URLS" | grep -vE 'compatible|go[0-9]+' | grep "${TARGET}" | head -n 1)
-    FALLBACK_GO=$(echo "$ALL_URLS" | grep -v "compatible" | grep "go" | grep "${TARGET}" | head -n 1)
-    FALLBACK_COMPATIBLE=$(echo "$ALL_URLS" | grep "compatible" | grep "${TARGET}" | head -n 1)
-
-    # 最终选定
-    FILENAME=${BEST_MATCH:-${FALLBACK_GO:-$FALLBACK_COMPATIBLE}}
-
-    if [[ -z "$FILENAME" ]]; then
-        echo -e "${RED}❌ 无法获取有效下载地址，请检查网络或架构匹配规则。${NC}"
-        exit 1
-    fi
-
-    FILENAME_BASE=$(basename "$FILENAME")
-    echo -e "${GREEN}⬇️ 开始下载 Mihomo: $FILENAME_BASE${NC}"
-    wget -O "$FILENAME_BASE" "$FILENAME"
-
-    # 解压逻辑：.gz 是单文件
+    # 解压 .gz 文件
     if [[ "$FILENAME_BASE" == *.gz ]]; then
         echo -e "${GREEN}📦 解压 gzip 文件...${NC}"
         gunzip -f "$FILENAME_BASE"
@@ -71,7 +74,6 @@ download_and_install_mihomo() {
         exit 1
     fi
 
-    # 重命名为标准名，并移动到/usr/local/bin
     mv "$BIN" mihomo
     chmod +x mihomo
     sudo mv mihomo /usr/local/bin/mihomo
@@ -81,22 +83,33 @@ download_and_install_mihomo() {
 # ========== ⚙️ 配置 Mihomo ==========
 configure_mihomo() {
     MIHOMO_DIR="$HOME/.config/mihomo"
-    CONFIG_URL=""  # 👈 可自定义你的订阅链接
+    CONFIG_URL=""  # 自定义 config.yaml 订阅链接
     MMDB_URL="https://github.com/Dreamacro/maxmind-geoip/releases/latest/download/Country.mmdb"
 
-    mkdir -p "$MIHOMO_DIR"
+    [[ -d "$MIHOMO_DIR" ]] || mkdir -p "$MIHOMO_DIR"
 
-    if [[ -f "$MIHOMO_DIR/config.yaml" ]]; then
-        echo -e "${GREEN}✅ config.yaml 已存在，跳过下载${NC}"
+    FOUND_CFG=""
+    for file in *.yaml; do
+        [[ ! -f "$file" ]] && continue
+        if grep -qE '^mixed-port:' "$file"; then
+            FOUND_CFG="$file"
+            break
+        fi
+    done
+
+    if [[ -n "$FOUND_CFG" ]]; then
+        echo -e "${YELLOW}📁 检测到 Mihomo 配置文件：$FOUND_CFG，已覆盖 config.yaml${NC}"
+        cp -f "$FOUND_CFG" "$MIHOMO_DIR/config.yaml"
     elif [[ -n "$CONFIG_URL" ]]; then
         wget -O "$MIHOMO_DIR/config.yaml" "$CONFIG_URL"
     else
-        echo -e "${YELLOW}⚠️ 未提供订阅链接，请将 config.yaml 手动放入：$MIHOMO_DIR${NC}"
+        echo -e "${YELLOW}⚠️ 未提供订阅链接或本地配置文件，请手动放入：$MIHOMO_DIR/config.yaml${NC}"
     fi
 
-    if [[ -f "$MIHOMO_DIR/Country.mmdb" ]]; then
-        echo -e "${GREEN}✅ Country.mmdb 已存在，跳过下载${NC}"
-    else
+    if [[ -f ./Country.mmdb ]]; then
+        echo -e "${YELLOW}📁 检测到本地 Country.mmdb，已覆盖地理数据文件${NC}"
+        mv -f ./Country.mmdb "$MIHOMO_DIR/Country.mmdb"
+    elif [[ ! -f "$MIHOMO_DIR/Country.mmdb" ]]; then
         if ! wget -O "$MIHOMO_DIR/Country.mmdb" "$MMDB_URL"; then
             echo -e "${YELLOW}⚠️ 无法下载 Country.mmdb，请手动放入：$MIHOMO_DIR${NC}"
         fi
