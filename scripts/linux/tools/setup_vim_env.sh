@@ -11,7 +11,6 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # 无颜色
 
 # 检测包管理器
-
 detect_package_manager() {
     if command -v apt-get &> /dev/null; then
         PACKAGE_MANAGER="apt-get"
