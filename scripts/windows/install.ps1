@@ -286,6 +286,191 @@ Set-Content -Path $PROFILE -Value $ProfileConfig
 
 # 定义模块配置文件及内容
 $files = @{
+    "env.ps1" = @'
+$start = Get-Date
+Write-Host "🚀 开始加载 env 配置：$start" -ForegroundColor Cyan
+
+# ========== 系统级环境变量 ==========
+
+# 设置 JAVA_HOME
+$javaPath = "C:\Program Files\Java\jdk-17"
+if (Test-Path $javaPath) {
+    Set-Item -Path "Env:JAVA_HOME" -Value $javaPath
+    if (-not $env:Path.ToLower().Contains("$javaPath\bin".ToLower())) {
+        $env:Path += ";$javaPath\bin"
+    }
+    Write-Host "✅ JAVA_HOME 设置为 $javaPath"
+} else {
+    Write-Warning "⚠️ 未找到 JAVA 路径：$javaPath"
+}
+
+# 设置 Qt 环境变量（推荐名称来自官方文档）
+$qtDir = "C:\Qt\6.7.2\msvc2019_64"
+$qtBin = "$qtDir\bin"
+$qtPlugins = "$qtDir\plugins"
+$qtPlatform = "$qtPlugins\platforms"
+if (Test-Path $qtDir) {
+    Set-Item -Path "Env:QTDIR" -Value $qtDir
+    Set-Item -Path "Env:QT_PLUGIN_PATH" -Value $qtPlugins
+    Set-Item -Path "Env:QT_QPA_PLATFORM_PLUGIN_PATH" -Value $qtPlatform
+    if ((Test-Path $qtBin) -and ($env:Path -notlike "*$qtBin*")) {
+        $env:Path += ";$qtBin"
+    }
+    Write-Host "✅ QTDIR 设置为 $qtDir"
+    Write-Host "✅ QT_PLUGIN_PATH 设置为 $qtPlugins"
+    Write-Host "✅ QT_QPA_PLATFORM_PLUGIN_PATH 设置为 $qtPlatform"
+} else {
+    Write-Warning "⚠️ 未找到 Qt 路径：$qtDir"
+}
+
+# ========== 用户级环境变量 ==========
+
+# 设置 Python 开发环境
+$pythonPath = "$env:USERPROFILE\AppData\Local\Programs\Python\Python312"
+$pythonBin = "$pythonPath"
+if (Test-Path $pythonPath) {
+    Set-Item -Path "Env:PYTHON_HOME" -Value $pythonPath
+    if ((Test-Path $pythonBin) -and ($env:Path -notlike "*$pythonBin*")) {
+        $env:Path += ";$pythonBin;$pythonBin\Scripts"
+    }
+    Write-Host "✅ PYTHON_HOME 设置为 $pythonPath"
+} else {
+    Write-Warning "⚠️ 未找到 Python 路径：$pythonPath"
+}
+
+# 设置 Go 开发环境
+$goRoot = "C:\Go"
+$goPath = "$HOME\go"
+$goBin = "$goRoot\bin"
+$goPathBin = "$goPath\bin"
+if (Test-Path $goRoot) {
+    Set-Item -Path "Env:GOROOT" -Value $goRoot
+    Set-Item -Path "Env:GOPATH" -Value $goPath
+    if ((Test-Path $goBin) -and ($env:Path -notlike "*$goBin*")) {
+        $env:Path += ";$goBin"
+    }
+    if ((Test-Path $goPathBin) -and ($env:Path -notlike "*$goPathBin*")) {
+        $env:Path += ";$goPathBin"
+    }
+    Write-Host "✅ GOROOT 设置为 $goRoot"
+    Write-Host "✅ GOPATH 设置为 $goPath"
+} else {
+    Write-Warning "⚠️ 未找到 Go 安装目录：$goRoot"
+}
+
+# 设置 Rust 环境（cargo）
+$cargoBin = "$env:USERPROFILE\\.cargo\\bin"
+if (Test-Path $cargoBin) {
+    if ($env:Path -notlike "*$cargoBin*") {
+        $env:Path += ";$cargoBin"
+    }
+    Write-Host "✅ Rust cargo 路径添加到 PATH：$cargoBin"
+} else {
+    Write-Warning "⚠️ 未找到 Rust cargo 路径：$cargoBin"
+}
+
+# 设置 Node.js 的路径（通常已自动配置）
+$nodePath = "C:\Program Files\nodejs"
+if (Test-Path "$nodePath\node.exe") {
+    if ($env:Path -notlike "*$nodePath*") {
+        $env:Path += ";$nodePath"
+    }
+    Write-Host "✅ Node.js 路径添加到 PATH：$nodePath"
+} else {
+    Write-Warning "⚠️ 未找到 Node.js：$nodePath"
+}
+
+# 设置 npm 的路径（通常已自动配置）
+$npmGlobalPath = "$env:APPDATA\npm"
+if (Test-Path $npmGlobalPath) {
+    if ($env:Path -notlike "*$npmGlobalPath*") {
+        $env:Path += ";$npmGlobalPath"
+    }
+    Write-Host "✅ npm 全局模块路径添加到 PATH：$npmGlobalPath"
+} else {
+    Write-Warning "⚠️ 未找到 npm 全局路径：$npmGlobalPath"
+}
+
+# 设置 .NET SDK 路径（dotnet）
+$dotnetPath = "$env:ProgramFiles\\dotnet"
+if (Test-Path $dotnetPath) {
+    if ($env:Path -notlike "*$dotnetPath*") {
+        $env:Path += ";$dotnetPath"
+    }
+    Write-Host "✅ .NET SDK 路径添加到 PATH：$dotnetPath"
+} else {
+    Write-Warning "⚠️ 未找到 .NET SDK 路径：$dotnetPath"
+}
+
+# 设置 Scoop 的 apps 路径
+$scoopApps = "$env:USERPROFILE\\scoop\\shims"
+if (Test-Path $scoopApps) {
+    if ($env:Path -notlike "*$scoopApps*") {
+        $env:Path += ";$scoopApps"
+    }
+    Write-Host "✅ Scoop 路径添加到 PATH：$scoopApps"
+} else {
+    Write-Warning "⚠️ 未找到 Scoop 应用路径：$scoopApps"
+}
+
+# WSL 子系统（不需设置 PATH，但可检查是否可用）
+if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
+    Write-Host "✅ 检测到 WSL 可用，输入 'wsl' 启动 Linux 子系统"
+} else {
+    Write-Warning "⚠️ 未检测到 WSL，请启用 Windows 子系统或安装 Linux 发行版"
+}
+
+# Anaconda 环境（默认安装位置）
+$condaPath = "$env:USERPROFILE\anaconda3"
+$condaBin = "$condaPath\Scripts"
+if (Test-Path $condaPath) {
+    Set-Item -Path "Env:CONDA_HOME" -Value $condaPath
+    if ($env:Path -notlike "*$condaPath*") {
+        $env:Path += ";$condaPath;$condaBin"
+    }
+    Write-Host "✅ Anaconda 环境已配置：$condaPath"
+} else {
+    Write-Warning "⚠️ 未找到 Anaconda 安装路径：$condaPath"
+}
+
+# 设置 JetBrains 系列（比如 PyCharm、CLion 等）
+$jetBrainsBase = "$env:LOCALAPPDATA\Programs"
+$jetBrainsProducts = @(
+    "PyCharm Professional",
+    "DataGrip",
+    "DataSpell",
+    "CLion",
+    "IntelliJ IDEA Ultimate",
+    "Android Studio"
+)
+foreach ($product in $jetBrainsProducts) {
+    $binPath = "$jetBrainsBase\$product\bin"
+    if (Test-Path $binPath) {
+        if ($env:Path -notlike "*$binPath*") {
+            $env:Path += ";$binPath"
+        }
+        Write-Host "✅ JetBrains [$product] 路径添加到 PATH：$binPath"
+    } else {
+        Write-Host "ℹ️ 可选 JetBrains 工具未安装：$product"
+    }
+}
+
+# 自定义脚本路径（如有）
+$customScripts = "$env:USERPROFILE\\scripts"
+if (Test-Path $customScripts) {
+    if ($env:Path -notlike "*$customScripts*") {
+        $env:Path += ";$customScripts"
+    }
+    Write-Host "✅ Custom 脚本路径添加到 PATH：$customScripts"
+} else {
+    Write-Host "📁 尚未配置 custom 脚本目录，如需使用请创建：$customScripts"
+}
+
+$end = Get-Date
+$duration = ($end - $start).TotalSeconds
+Write-Host "✅ 环境变量加载完成，用时 $duration 秒`n" -ForegroundColor Green
+'@;
+
     "aliases.ps1" = @'
 $start = Get-Date
 Write-Host "🚀 开始加载 aliases 配置：$start" -ForegroundColor Cyan
